@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Thymeleaf</title>
+</head>
+<body>
+<p>[[${loops.size()}]] </p>
+<p>https://www.thymeleaf.org/doc/tutorials/2.1/usingthymeleaf.html#expression-utility-objects</p>
+
+<ul>
+    <li th:each="loop,index : ${loops}" th:text="${loop + ' (i) '+index.index}"></li>
+</ul>
+
+
+<ul>
+    <li><code>${...}</code> : Variable expressions.</li>
+    <li><code>*{...}</code> : Selection expressions.</li>
+    <li><code>#{...}</code> : Message (i18n) expressions.</li>
+    <li><code>@{...}</code> : Link (URL) expressions.</li>
+    <li><code>~{...}</code> : Fragment expressions.</li>
+</ul>
+
+</body>
+</html>
