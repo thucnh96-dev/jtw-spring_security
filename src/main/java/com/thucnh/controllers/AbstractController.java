@@ -1,11 +1,9 @@
-package com.thucnh.controller;
+package com.thucnh.controllers;
 
 import com.thucnh.model.Member;
 import com.thucnh.response.ResponseUtil;
 import com.thucnh.service.MemberService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.security.Principal;
 
