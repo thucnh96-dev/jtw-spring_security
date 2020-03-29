@@ -34,4 +34,7 @@ public class Member implements Serializable {
     public void addMemberRoles(Set<Role> roles){
         this.roles.addAll(roles);
     }
+
+    @Transient
+    private Set<String> memberRoles;
 }

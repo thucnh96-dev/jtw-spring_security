@@ -1,6 +1,7 @@
 package com.thucnh.controllers.memberAPI;
 
 import com.thucnh.controllers.AbstractController;
+import com.thucnh.helper.SecurityHelper;
 import com.thucnh.model.Member;
 import com.thucnh.model.Role;
 import com.thucnh.model.enums.ROLE;
@@ -22,15 +23,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -55,6 +51,9 @@ public class AuthController extends AbstractController {
     @Autowired
     @Qualifier("loginValidator")
     LoginValidator loginValidator;
+
+    @Autowired
+    SecurityHelper securityHelper;
 
     @Autowired
     MessageSource messageSource;
@@ -121,6 +120,26 @@ public class AuthController extends AbstractController {
 
         String msg =  messageSource.getMessage("member.register.done",new Object[]{saveMember.getEmail()}, Locale.getDefault());
 
+        return responseUtil.successResponse(new MessageResponse(msg));
+    }
+    @GetMapping(value = "/auth/wso2/complete")
+    public ResponseEntity<?> login(){
+
+        OAuth2Authentication authentication = (OAuth2Authentication) SecurityContextHolder.getContext().getAuthentication();
+        Map<String, String> map = (HashMap<String, String>) authentication.getUserAuthentication().getDetails();
+        // TODO
+        // check request OAuth2Authentication for  data.
+        String email= map.get("open_id") + "wso2.com";
+        Member member =memberService.findByEmail(email);
+        if (member == null){
+
+          // save member
+        }else{
+            // save member
+        }
+        // generate token for user
+        securityHelper.autologin(member.getEmail(),member.getPassword());
+        String msg =  messageSource.getMessage("member.oauth2.done",null, Locale.getDefault());
         return responseUtil.successResponse(new MessageResponse(msg));
     }
 
