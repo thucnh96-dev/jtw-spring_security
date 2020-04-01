@@ -21,4 +21,14 @@ public class ThymeleafTraining {
 
         return "thymeleaf/training";
     }
+    @GetMapping(value = "/login")
+    public String login(Model model){
+
+        return "thymeleaf/index";
+    }
+    @GetMapping(value = "/")
+    public String i(Model model){
+
+        return "thymeleaf/wellcome";
+    }
 }

@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 @RequestMapping(value = "/api/auth")
 public class AuthController extends AbstractController {
 
-    @Autowired
+    @Autowired(required = true)
     AuthenticationManager authenticationManager;
 
     @Autowired
@@ -133,7 +134,27 @@ public class AuthController extends AbstractController {
         Member member =memberService.findByEmail(email);
         if (member == null){
 
-          // save member
+            // save member
+        }else{
+            // save member
+        }
+        // generate token for user
+        securityHelper.autologin(member.getEmail(),member.getPassword());
+        String msg =  messageSource.getMessage("member.oauth2.done",null, Locale.getDefault());
+        return responseUtil.successResponse(new MessageResponse(msg));
+    }
+    @GetMapping(value = "/github/complete")
+    public ResponseEntity<?> git(){
+
+        OAuth2Authentication authentication = (OAuth2Authentication) SecurityContextHolder.getContext().getAuthentication();
+        Map<String, String> map = (HashMap<String, String>) authentication.getUserAuthentication().getDetails();
+        // TODO
+        // check request OAuth2Authentication for  data.
+        String email= map.get("open_id") + "wso2.com";
+        Member member =memberService.findByEmail(email);
+        if (member == null){
+
+            // save member
         }else{
             // save member
         }

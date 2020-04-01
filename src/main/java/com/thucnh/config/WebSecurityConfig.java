@@ -1,20 +1,20 @@
 package com.thucnh.config;
 
-import com.thucnh.config.oauth2.ClientResources;
 import com.thucnh.security.UserDetailServiceImpl;
 import com.thucnh.security.jtw.AuthEntryPointJwt;
 import com.thucnh.security.jtw.AuthTokenFilter;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.security.oauth2.client.EnableOAuth2Sso;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.ResourceServerProperties;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -25,13 +25,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticationProcessingFilter;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilter;
-import org.springframework.security.oauth2.client.resource.OAuth2ProtectedResourceDetails;
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
-import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.web.filter.CharacterEncodingFilter;
+import org.springframework.web.context.request.RequestContextListener;
 import org.springframework.web.filter.CompositeFilter;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -40,16 +37,11 @@ import org.springframework.security.oauth2.client.OAuth2ClientContext;
 
 import javax.servlet.Filter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
 @EnableOAuth2Client
-@EnableGlobalMethodSecurity(
-        // securedEnabled = true,
-        // jsr250Enabled = true,
-        prePostEnabled = true)
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter implements WebMvcConfigurer {
 
     @Autowired
@@ -78,35 +70,62 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter implements W
     }
 
     @Bean
-    @ConfigurationProperties("openId")
-    public ClientResources openId() {
-        return new ClientResources();
+    @ConfigurationProperties("wso2.client")
+    public AuthorizationCodeResourceDetails wso2Client() {
+        return new AuthorizationCodeResourceDetails();
     }
+
+    @Bean
+    @ConfigurationProperties("wso2.resource")
+    public ResourceServerProperties wso2Resource() {
+        return new ResourceServerProperties ();
+    }
+
+    @Bean
+    @ConfigurationProperties("github.resource")
+    public ResourceServerProperties githubResource() {
+        return new ResourceServerProperties ();
+    }
+    @Bean
+    @ConfigurationProperties("github.client")
+    public AuthorizationCodeResourceDetails githubClient() {
+        return new AuthorizationCodeResourceDetails();
+    }
+
+
     @Bean
     public FilterRegistrationBean<OAuth2ClientContextFilter> oauth2ClientFilterRegistration(OAuth2ClientContextFilter filter) {
         FilterRegistrationBean<OAuth2ClientContextFilter> registration = new FilterRegistrationBean<OAuth2ClientContextFilter>();
         registration.setFilter(filter);
-        registration.setOrder(-100);
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
         return registration;
     }
 
     private Filter ssoFilter() {
         CompositeFilter filter = new CompositeFilter();
         List<Filter> filters = new ArrayList<>();
-        filters.add(ssoFilter(openId(), "/auth/wso2", "/auth/wso2/complete"));
+    //    filters.add(oauth2ClientFilter("/login/wso2"));
+        filters.add(oauth2ClientFilter("/login/github","/api/auth/github/complete",githubResource(),githubClient()));
         filter.setFilters(filters);
         return filter;
     }
-    private Filter ssoFilter(ClientResources client, String path, String redirectUrl) {
-        OAuth2ClientAuthenticationProcessingFilter filter = new OAuth2ClientAuthenticationProcessingFilter(path);
-        OAuth2RestTemplate template = new OAuth2RestTemplate(client.getClient(), oauth2ClientContext);
 
-        filter.setRestTemplate(template);
-        filter.setTokenServices(new UserInfoTokenServices(client.getResource().getUserInfoUri(), client.getClient().getClientId()));
-        filter.setAuthenticationSuccessHandler((request, response, authentication) -> response.sendRedirect(redirectUrl.toString()));
-        filter.setAuthenticationFailureHandler((request, response, exception) -> response.sendRedirect("/error"));
-        return filter;
+
+
+    private Filter oauth2ClientFilter(String baseUrl,String redirectUrl,ResourceServerProperties resourceServerProperties
+            , AuthorizationCodeResourceDetails authorizationCodeResourceDetails ) {
+        OAuth2ClientAuthenticationProcessingFilter oauth2ClientFilter = new OAuth2ClientAuthenticationProcessingFilter(baseUrl);
+        OAuth2RestTemplate restTemplate = new OAuth2RestTemplate(authorizationCodeResourceDetails, oauth2ClientContext);
+        oauth2ClientFilter.setRestTemplate(restTemplate);
+        UserInfoTokenServices tokenServices = new UserInfoTokenServices(resourceServerProperties.getUserInfoUri(),authorizationCodeResourceDetails.getClientId());
+        tokenServices.setRestTemplate(restTemplate);
+        oauth2ClientFilter.setTokenServices(tokenServices);
+      //  System.out.println("getAccessToken = " + restTemplate.getAccessToken() );
+        oauth2ClientFilter.setAuthenticationSuccessHandler((request, response, authentication) -> response.sendRedirect(redirectUrl));
+    //    oauth2ClientFilter.setAuthenticationFailureHandler((request, response, exception) -> response.sendRedirect("/error"));*/
+        return oauth2ClientFilter;
     }
+
 
     @Override
     public void configure(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
@@ -116,23 +135,25 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter implements W
     @Override
     protected void configure(HttpSecurity http) throws Exception {
 
-        CharacterEncodingFilter filter = new CharacterEncodingFilter();
-        filter.setEncoding("UTF-8");
-        filter.setForceEncoding(true);
-        http.addFilterBefore(filter, CsrfFilter.class);
-
         http.cors().and().csrf().disable()
                 .exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
                 .authorizeRequests()
                 .antMatchers("/api/auth/**").permitAll()
                 .antMatchers("/api/test/**").permitAll()
+                .antMatchers("/login/**").permitAll()
                 .antMatchers("/thymeleaf").permitAll()
                 .antMatchers("/**", "/v2/api-docs", "/configuration/**", "/swagger*/**", "/webjars/**")
                 .permitAll()
                 .anyRequest().authenticated();
-        http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(ssoFilter(), BasicAuthenticationFilter.class);
+              http.addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
+              //     addFilterAfter(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
+
+    }
+
+    @Bean
+    public RequestContextListener requestContextListener() {
+        return new RequestContextListener();
     }
 
     @Override
